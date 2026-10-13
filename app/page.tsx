@@ -40,6 +40,11 @@ export default function DeliveryPOS() {
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
+  // Safe client-side date strings to prevent Next.js prerender errors
+  const [todayStr, setTodayStr] = useState("");
+  const [yesterdayStr, setYesterdayStr] = useState("");
+  const [currentMonthStr, setCurrentMonthStr] = useState("");
+
   const isDark = theme === "dark";
   const bgMain = isDark ? "bg-slate-950" : "bg-slate-50";
   const textMain = isDark ? "text-slate-100" : "text-slate-900";
@@ -80,7 +85,13 @@ export default function DeliveryPOS() {
 
   useEffect(() => {
     setMounted(true);
-    setCurrentTime(new Date());
+    const now = new Date();
+    setCurrentTime(now);
+    
+    setTodayStr(format(now, "yyyy-MM-dd"));
+    setYesterdayStr(format(new Date(now.getTime() - 86400000), "yyyy-MM-dd"));
+    setCurrentMonthStr(format(now, "yyyy-MM"));
+
     const timer = setInterval(() => setCurrentTime(new Date()), 60000);
 
     const savedData = localStorage.getItem("master_pos_data");
@@ -118,11 +129,6 @@ export default function DeliveryPOS() {
   const prodPriceRef = useRef<HTMLInputElement>(null);
 
   const filteredMenu = menuItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
-
-  // Safe Date Filtering (Fixes Next.js Build Hydration Error)
-  const todayStr = format(new Date(), "yyyy-MM-dd");
-  const yesterdayStr = format(new Date(Date.now() - 86400000), "yyyy-MM-dd");
-  const currentMonthStr = format(new Date(), "yyyy-MM");
 
   const filteredSales = salesHistory.filter(sale => {
     const sDateStr = sale.date.split("T")[0];
