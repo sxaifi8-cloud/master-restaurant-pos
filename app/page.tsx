@@ -9,7 +9,7 @@ import {
   Moon, Sun, X, Calendar, ArrowUpRight, ArrowDownRight, Tag,
   ArrowDownLeft, Clock
 } from "lucide-react";
-import { format, isToday, isYesterday, isThisMonth } from "date-fns";
+import { format } from "date-fns";
 
 const CURRENCIES = [
   { symbol: "$", label: "USD ($)" },
@@ -18,7 +18,6 @@ const CURRENCIES = [
   { symbol: "€", label: "EUR (€)" },
 ];
 
-// Default Initial Data
 const DEFAULT_SETTINGS = { currency: "Rs ", logoUrl: "", deliveryFee: 0.00, storeName: "Master Restaurant", receiptSize: "80mm" };
 const DEFAULT_MENU = [
   { id: "1", name: "Smash Burger", price: 899, image: "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=300&h=300&fit=crop" },
@@ -31,20 +30,16 @@ const DEFAULT_SALES = [
 ];
 const DEFAULT_PURCHASES = [
   { orderId: "PO-20261013-2001", date: "2026-10-12T09:00:00Z", supplier: { name: "Fresh Farms Poultry", contact: "0311-9876543" }, items: [{name: "Chicken Breast (kg)", qty: 50, price: 450}], subtotal: 22500, total: 22500, currency: "Rs ", status: "Paid", recordedBy: "Admin" },
-  { orderId: "PO-20261013-2002", date: "2026-10-13T08:30:00Z", supplier: { name: "Local Bakery", contact: "0322-1234567" }, items: [{name: "Burger Buns (pcs)", qty: 200, price: 25}], subtotal: 5000, total: 5000, currency: "Rs ", status: "Pending", recordedBy: "Admin" }
 ];
 
 export default function DeliveryPOS() {
-  // Theme & Layout State
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const [activeTab, setActiveTab] = useState<"pos" | "sales" | "catalog" | "purchases" | "customers" | "suppliers" | "ingredients" | "staff" | "expenses" | "settings">("pos");
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
-  // Mounted State for Hydration Fix
   const [mounted, setMounted] = useState(false);
   const [currentTime, setCurrentTime] = useState<Date | null>(null);
 
-  // Dynamic Theme Colors
   const isDark = theme === "dark";
   const bgMain = isDark ? "bg-slate-950" : "bg-slate-50";
   const textMain = isDark ? "text-slate-100" : "text-slate-900";
@@ -53,7 +48,6 @@ export default function DeliveryPOS() {
   const bgInput = isDark ? "bg-slate-950" : "bg-slate-50";
   const textMuted = isDark ? "text-slate-400" : "text-slate-500";
 
-  // Persistent Databases (State)
   const [storeSettings, setStoreSettings] = useState(DEFAULT_SETTINGS);
   const [menuItems, setMenuItems] = useState(DEFAULT_MENU);
   const [salesHistory, setSalesHistory] = useState<any[]>(DEFAULT_SALES);
@@ -62,24 +56,20 @@ export default function DeliveryPOS() {
   const [isEditingSettings, setIsEditingSettings] = useState(false);
   const [tempSettings, setTempSettings] = useState({ ...storeSettings });
 
-  // POS Keyboard Navigation States
   const [searchQuery, setSearchQuery] = useState("");
   const [navZone, setNavZone] = useState<'inputs' | 'grid'>('inputs');
   const [focusedProductIndex, setFocusedProductIndex] = useState<number>(-1);
   
-  // Sales Dashboard States
   const [salesSearchQuery, setSalesSearchQuery] = useState("");
-  const [salesFilter, setSalesFilter] = useState<"today" | "yesterday" | "month" | "custom" | "all">("today");
+  const [salesFilter, setSalesFilter] = useState<"today" | "yesterday" | "month" | "all">("all");
   const [focusedSaleIndex, setFocusedSaleIndex] = useState<number>(-1);
   const [selectedReceipt, setSelectedReceipt] = useState<any>(null);
 
-  // Purchases Dashboard States
   const [purchaseSearchQuery, setPurchaseSearchQuery] = useState("");
-  const [purchaseFilter, setPurchaseFilter] = useState<"today" | "yesterday" | "month" | "custom" | "all">("all");
+  const [purchaseFilter, setPurchaseFilter] = useState<"today" | "yesterday" | "month" | "all">("all");
   const [focusedPurchaseIndex, setFocusedPurchaseIndex] = useState<number>(-1);
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   
-  // Input Refs
   const searchRef = useRef<HTMLInputElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const phoneRef = useRef<HTMLInputElement>(null);
@@ -88,7 +78,6 @@ export default function DeliveryPOS() {
   const salesSearchRef = useRef<HTMLInputElement>(null);
   const purchaseSearchRef = useRef<HTMLInputElement>(null);
 
-  // --- LOCAL STORAGE AUTO-LOAD ---
   useEffect(() => {
     setMounted(true);
     setCurrentTime(new Date());
@@ -107,7 +96,6 @@ export default function DeliveryPOS() {
     return () => clearInterval(timer);
   }, []);
 
-  // --- LOCAL STORAGE AUTO-SAVE ---
   useEffect(() => {
     if (mounted) {
       localStorage.setItem("master_pos_data", JSON.stringify({ menuItems, storeSettings, salesHistory, purchasesHistory }));
@@ -131,13 +119,17 @@ export default function DeliveryPOS() {
 
   const filteredMenu = menuItems.filter(item => item.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
-  // Process Sales Filters
+  // Safe Date Filtering (Fixes Next.js Build Hydration Error)
+  const todayStr = format(new Date(), "yyyy-MM-dd");
+  const yesterdayStr = format(new Date(Date.now() - 86400000), "yyyy-MM-dd");
+  const currentMonthStr = format(new Date(), "yyyy-MM");
+
   const filteredSales = salesHistory.filter(sale => {
-    const sDate = new Date(sale.date);
+    const sDateStr = sale.date.split("T")[0];
     let dateMatch = true;
-    if (salesFilter === "today") dateMatch = isToday(sDate);
-    if (salesFilter === "yesterday") dateMatch = isYesterday(sDate);
-    if (salesFilter === "month") dateMatch = isThisMonth(sDate);
+    if (salesFilter === "today") dateMatch = sDateStr === todayStr;
+    if (salesFilter === "yesterday") dateMatch = sDateStr === yesterdayStr;
+    if (salesFilter === "month") dateMatch = sale.date.startsWith(currentMonthStr);
     if (salesFilter === "all") dateMatch = true;
     
     const searchStr = `${sale.orderId} ${sale.customer.name} ${sale.customer.phone} ${sale.recordedBy}`.toLowerCase();
@@ -149,13 +141,12 @@ export default function DeliveryPOS() {
   const totalReturnsAmt = filteredSales.filter(s => s.type === "Return").reduce((sum, s) => sum + s.total, 0);
   const totalDiscountAmt = filteredSales.reduce((sum, s) => sum + (s.discount || 0), 0);
 
-  // Process Purchase Filters
   const filteredPurchases = purchasesHistory.filter(pur => {
-    const pDate = new Date(pur.date);
+    const pDateStr = pur.date.split("T")[0];
     let dateMatch = true;
-    if (purchaseFilter === "today") dateMatch = isToday(pDate);
-    if (purchaseFilter === "yesterday") dateMatch = isYesterday(pDate);
-    if (purchaseFilter === "month") dateMatch = isThisMonth(pDate);
+    if (purchaseFilter === "today") dateMatch = pDateStr === todayStr;
+    if (purchaseFilter === "yesterday") dateMatch = pDateStr === yesterdayStr;
+    if (purchaseFilter === "month") dateMatch = pur.date.startsWith(currentMonthStr);
     if (purchaseFilter === "all") dateMatch = true;
     
     const searchStr = `${pur.orderId} ${pur.supplier.name} ${pur.supplier.contact} ${pur.recordedBy}`.toLowerCase();
@@ -166,7 +157,6 @@ export default function DeliveryPOS() {
   const totalPurchasesAmt = filteredPurchases.reduce((sum, p) => sum + p.total, 0);
   const totalPendingAmt = filteredPurchases.filter(p => p.status === "Pending").reduce((sum, p) => sum + p.total, 0);
 
-  // --- Global Keyboard Listener ---
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key.toLowerCase() === 'b') { e.preventDefault(); setIsSidebarOpen(prev => !prev); return; }
@@ -175,7 +165,6 @@ export default function DeliveryPOS() {
       if (e.key === 'F4') { e.preventDefault(); setActiveTab('catalog'); return; }
       if (e.key === 'F8') { e.preventDefault(); setActiveTab('settings'); return; }
 
-      // Receipt Modals Override
       if (selectedReceipt) {
         if (e.key === 'Escape') { e.preventDefault(); setSelectedReceipt(null); }
         if (e.key === 'p' && e.ctrlKey) { e.preventDefault(); setTimeout(() => window.print(), 100); }
@@ -187,7 +176,6 @@ export default function DeliveryPOS() {
         return; 
       }
 
-      // SALES TAB
       if (activeTab === "sales") {
         const isInputFocused = document.activeElement?.tagName === 'INPUT';
         if (e.key === 'ArrowDown' && !isInputFocused) { e.preventDefault(); setFocusedSaleIndex(p => Math.min(p + 1, filteredSales.length - 1)); }
@@ -199,7 +187,6 @@ export default function DeliveryPOS() {
         return;
       }
 
-      // PURCHASES TAB
       if (activeTab === "purchases") {
         const isInputFocused = document.activeElement?.tagName === 'INPUT';
         if (e.key === 'ArrowDown' && !isInputFocused) { e.preventDefault(); setFocusedPurchaseIndex(p => Math.min(p + 1, filteredPurchases.length - 1)); }
@@ -211,7 +198,6 @@ export default function DeliveryPOS() {
         return;
       }
 
-      // POS TAB
       if (activeTab === "pos") {
         if (e.altKey && e.key.toLowerCase() === 'f') { e.preventDefault(); setNavZone('inputs'); setFocusedProductIndex(-1); searchRef.current?.focus(); return; }
         if (e.altKey && e.key.toLowerCase() === 'c') { e.preventDefault(); handleCheckout(); return; }
@@ -228,7 +214,6 @@ export default function DeliveryPOS() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [searchQuery, menuItems, cart, customer, storeSettings, activeTab, focusedProductIndex, filteredMenu, navZone, focusedSaleIndex, filteredSales, selectedReceipt, focusedPurchaseIndex, filteredPurchases, selectedPurchase]);
 
-  // --- Functions ---
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string) => void) => {
     const file = e.target.files?.[0];
     if (file) { const reader = new FileReader(); reader.onloadend = () => setter(reader.result as string); reader.readAsDataURL(file); }
@@ -266,8 +251,6 @@ export default function DeliveryPOS() {
 
   return (
     <div className={`min-h-screen ${bgMain} flex font-sans ${textMain} transition-colors duration-300`}>
-      
-      {/* SIDEBAR NAVIGATION */}
       <aside className={`${isSidebarOpen ? 'w-64' : 'w-20'} bg-slate-900 text-slate-300 flex flex-col hidden md:flex shrink-0 transition-all duration-300 relative z-20 shadow-xl`}>
         <div className="p-4 flex items-center justify-between border-b border-slate-800 h-16">
           {isSidebarOpen && <span className="font-bold text-lg text-white truncate flex items-center gap-2"><Store className="h-5 w-5 text-orange-500 shrink-0" /> Master POS</span>}
@@ -302,14 +285,12 @@ export default function DeliveryPOS() {
           </button>
         </nav>
         
-        {/* BRANDING FOOTER */}
         <div className="mt-auto p-4 border-t border-slate-800 text-center bg-slate-950">
           <p className={`text-[9px] text-slate-500 uppercase tracking-widest leading-relaxed ${!isSidebarOpen && 'hidden'}`}>Powered By<br/><span className="text-orange-500 font-bold text-[10px]">Xaifi Digital Marketing Agency</span></p>
           {!isSidebarOpen && <p className="text-[9px] text-orange-500 font-bold tracking-widest mx-auto" style={{writingMode: 'vertical-rl', transform: 'rotate(180deg)'}}>XAIFI DIGITAL</p>}
         </div>
       </aside>
 
-      {/* MOBILE NAV (Bottom Bar) */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 text-white flex justify-between p-2 z-50 border-t border-slate-800 overflow-x-auto gap-2">
         {[ { id: "pos", icon: ShoppingBag, label: "POS" }, { id: "sales", icon: Banknote, label: "Sales" }, { id: "purchases", icon: ShoppingCart, label: "Purchases" }, { id: "settings", icon: Settings, label: "Setup" } ].map((item) => (
           <button key={item.id} onClick={() => setActiveTab(item.id as any)} className={`flex flex-col items-center p-2 min-w-[64px] rounded-lg ${activeTab === item.id ? "bg-slate-800 text-orange-500" : "text-slate-400"}`}>
@@ -318,10 +299,7 @@ export default function DeliveryPOS() {
         ))}
       </div>
 
-      {/* MAIN CONTENT AREA */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden pb-16 md:pb-0 relative z-10">
-        
-        {/* Top Header Bar for Desktop */}
         <header className={`h-16 ${bgCard} border-b ${borderCard} flex items-center justify-between px-4 shrink-0 shadow-sm hidden md:flex transition-colors`}>
           <div className="flex items-center gap-4">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className={`p-2 rounded-lg ${isDark ? 'hover:bg-slate-800 text-slate-400' : 'bg-slate-100 hover:bg-slate-200 text-slate-600'} transition`} title="Ctrl + B">
@@ -357,7 +335,6 @@ export default function DeliveryPOS() {
           </div>
         </header>
 
-        {/* ================= 1. POS TERMINAL ================= */}
         {activeTab === "pos" && (
           <div className="flex-1 flex flex-col lg:flex-row p-3 gap-4 overflow-hidden">
             <div className={`flex-1 flex flex-col gap-3 overflow-hidden ${bgCard} rounded-xl shadow-sm border ${borderCard} p-4`}>
@@ -447,7 +424,6 @@ export default function DeliveryPOS() {
           </div>
         )}
 
-        {/* ================= 3. SALES & RETURNS EXCEL DASHBOARD ================= */}
         {activeTab === "sales" && (
           <div className="flex-1 flex flex-col p-4 md:p-6 gap-4 overflow-hidden">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
@@ -539,7 +515,6 @@ export default function DeliveryPOS() {
               </div>
             </div>
             
-            {/* Modal Overlay for Receipt Details */}
             {selectedReceipt && (
               <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className={`relative w-full max-w-md ${bgCard} border ${borderCard} rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full`}>
@@ -590,10 +565,8 @@ export default function DeliveryPOS() {
           </div>
         )}
 
-        {/* ================= 4. PURCHASES EXCEL DASHBOARD ================= */}
         {activeTab === "purchases" && (
           <div className="flex-1 flex flex-col p-4 md:p-6 gap-4 overflow-hidden">
-            
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 shrink-0">
               <div className={`p-4 rounded-xl border ${borderCard} ${bgCard} shadow-sm flex flex-col justify-center relative overflow-hidden`}>
                 <div className="absolute right-[-10px] top-[-10px] opacity-5 text-blue-500"><ArrowDownLeft className="h-32 w-32" /></div>
@@ -678,7 +651,6 @@ export default function DeliveryPOS() {
               </div>
             </div>
             
-            {/* Modal Overlay for Purchase Details */}
             {selectedPurchase && (
               <div className="absolute inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
                 <div className={`relative w-full max-w-md ${bgCard} border ${borderCard} rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-full`}>
@@ -729,7 +701,6 @@ export default function DeliveryPOS() {
           </div>
         )}
 
-        {/* ================= 5. CATALOG ADMIN ================= */}
         {activeTab === "catalog" && (
           <div className="flex-1 p-6 overflow-y-auto space-y-6">
             <div className={`p-5 rounded-xl shadow-sm border transition-colors ${isEditingProduct ? 'border-orange-500 ring-1 ring-orange-500' : borderCard} ${bgCard}`}>
@@ -772,7 +743,6 @@ export default function DeliveryPOS() {
           </div>
         )}
 
-        {/* ================= 10. SETTINGS ================= */}
         {activeTab === "settings" && (
           <div className="flex-1 p-6 overflow-y-auto space-y-6 max-w-2xl">
             <div className={`p-6 rounded-xl shadow-sm border ${borderCard} ${bgCard}`}>
@@ -790,13 +760,11 @@ export default function DeliveryPOS() {
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${textMuted}`}>Receipt Logo (Base64 Upload)</label>
                   <div className="flex items-end gap-4">
-                    {/* PATCHED: Safe conditional render to prevent Next.js empty string error */}
                     {tempSettings.logoUrl ? (
                       <img src={tempSettings.logoUrl} alt="Logo" className={`w-24 h-24 object-contain border ${borderCard} rounded-lg ${bgInput} p-2`} />
                     ) : (
                       <div className={`w-24 h-24 flex items-center justify-center border ${borderCard} rounded-lg ${bgInput} p-2 text-[10px] ${textMuted} text-center`}>No Logo</div>
                     )}
-                    
                     {isEditingSettings && <label className={`flex items-center justify-center border border-dashed border-slate-400 rounded-lg px-4 py-2.5 text-sm cursor-pointer hover:bg-slate-500/10 ${textMuted} font-medium h-fit`}><Upload className="h-4 w-4 mr-2" /> Upload PC Image<input type="file" accept="image/*" onChange={(e) => handleImageUpload(e, (val) => setTempSettings({...tempSettings, logoUrl: val}))} className="hidden" /></label>}
                   </div>
                 </div>
@@ -804,22 +772,19 @@ export default function DeliveryPOS() {
             </div>
           </div>
         )}
-
       </main>
 
-      {/* HIDDEN PRINTABLE RECEIPT */}
-      {(selectedReceipt || lastOrder) && (() => {
-        const pData = selectedReceipt || lastOrder;
+      {(selectedReceipt || lastOrder || selectedPurchase) && (() => {
+        const pData = selectedReceipt || lastOrder || selectedPurchase;
         return (
           <div id="printable-receipt" className="bg-white text-black p-3 text-xs font-mono hidden" style={{ width: storeSettings.receiptSize }}>
             <div className="text-center mb-3">
               {storeSettings.logoUrl && <img src={storeSettings.logoUrl} alt="Logo" className="w-14 h-14 object-contain mx-auto mb-1 grayscale contrast-125" style={{ filter: "grayscale(100%)", WebkitPrintColorAdjust: "exact", colorAdjust: "exact" }} />}
               <h1 className="font-bold text-lg uppercase">{storeSettings.storeName}</h1>
-              <p>Delivery & Receipt</p>
+              <p>Terminal Receipt</p>
               <p className="mt-1 font-bold border-b border-black pb-1 border-dashed">{pData.type === "Return" ? "REFUND RECEIPT" : "INVOICE"}</p>
             </div>
             <div className="mb-3"><p><strong>No:</strong> {pData.orderId}</p><p><strong>Date:</strong> {format(new Date(pData.date), "dd/MM/yyyy HH:mm")}</p></div>
-            <div className="mb-3 border-b border-black pb-3 border-dashed"><p className="font-bold">Bill To:</p><p>{pData.customer.name}</p><p>{pData.customer.phone}</p><p>{pData.customer.address}</p></div>
             <table className="w-full mb-3 text-[11px]">
               <thead><tr className="border-b border-black border-dashed"><th className="text-left pb-1">Qty</th><th className="text-left pb-1">Item</th><th className="text-right pb-1">Amt</th></tr></thead>
               <tbody>
@@ -827,9 +792,6 @@ export default function DeliveryPOS() {
               </tbody>
             </table>
             <div className="border-t border-black pt-2 border-dashed text-[11px]">
-              <div className="flex justify-between"><p>Subtotal</p><p>{pData.currency}{pData.subtotal.toFixed(0)}</p></div>
-              <div className="flex justify-between"><p>Delivery</p><p>{pData.currency}{pData.deliveryFee.toFixed(0)}</p></div>
-              {pData.discount > 0 && <div className="flex justify-between"><p>Discount</p><p>-{pData.currency}{pData.discount.toFixed(0)}</p></div>}
               <div className="flex justify-between font-bold text-sm mt-2"><p>TOTAL</p><p>{pData.currency}{pData.total.toFixed(0)}</p></div>
             </div>
             <div className="text-center mt-4 text-[10px]"><p>*** THANK YOU ***</p></div>
